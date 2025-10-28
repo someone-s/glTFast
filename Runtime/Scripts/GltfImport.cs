@@ -253,6 +253,7 @@ namespace GLTFast
         /// <summary>Main glTF data structure</summary>
         protected abstract RootBase Root { get; set; }
         UnityEngine.Material[] m_Materials;
+        bool[] m_MaterialsPersistent;
         List<UnityEngine.Object> m_Resources;
 
         /// <summary>
@@ -263,6 +264,7 @@ namespace GLTFast
         string[] m_NodeNames;
 
         List<UnityEngine.Mesh> m_Meshes;
+        List<bool> m_MeshesPersistent;
         FlatArray<MeshAssignment> m_MeshAssignments;
 
         Matrix4x4[][] m_SkinsInverseBindMatrices;
@@ -781,8 +783,23 @@ namespace GLTFast
                 }
             }
 
-            DisposeArray(m_Materials);
+            void DisposeArrayWithPersistence(IEnumerable<UnityEngine.Object> objects, IEnumerable<bool> persistence)
+            {
+                if (objects != null)
+                {
+                    var objectsEnumerator = objects.GetEnumerator();
+                    var persistenceEnumerator = persistence.GetEnumerator();
+                    while (objectsEnumerator.MoveNext() && persistenceEnumerator.MoveNext())
+                    {
+                        if (!persistenceEnumerator.Current)
+                            SafeDestroy(objectsEnumerator.Current);
+                    }
+                }
+            }
+
+            DisposeArrayWithPersistence(m_Materials, m_MaterialsPersistent);
             m_Materials = null;
+            m_MaterialsPersistent = null;
 
 #if UNITY_ANIMATION
             DisposeArray(m_AnimationClips);
@@ -802,8 +819,9 @@ namespace GLTFast
             }
 
             m_MeshAssignments = null;
-            DisposeArray(m_Meshes);
+            DisposeArrayWithPersistence(m_Meshes, m_MeshesPersistent);
             m_Meshes = null;
+            m_MeshesPersistent = null;
             DisposeArray(m_Resources);
             m_Resources = null;
         }
@@ -851,6 +869,20 @@ namespace GLTFast
                 return m_Materials[index];
             }
             return null;
+        }
+
+        /// <summary>
+        /// Mark a mesh to be kept when the GltfImport instance is disposed
+        /// </summary>
+        /// <returns>bool if index successfully marked as persistent</returns>
+        public bool MarkMaterialPersistent(int index)
+        {
+            if (m_MaterialsPersistent != null && index >= 0 && index < m_MaterialsPersistent.Length)
+            {
+                m_MaterialsPersistent[index] = true;
+                return true;
+            }
+            return false;
         }
 
         /// <inheritdoc />
@@ -953,12 +985,23 @@ namespace GLTFast
             if (m_Meshes == null || m_Meshes.Count < 1) return Array.Empty<UnityEngine.Mesh>();
             return m_Meshes.ToArray();
         }
-
+ 
         /// <summary>
         /// Allows accessing all imported meshes.
         /// </summary>
         public IReadOnlyCollection<UnityEngine.Mesh> Meshes => m_Meshes;
 
+
+        /// <summary>
+        /// Mark a mesh to be kept when the GltfImport instance is disposed
+        /// </summary>
+        /// <returns>bool if index successfully marked as persistent</returns>
+        public void MarkMeshPersistent(int meshIndex, int meshNumeration)
+        {
+            UnityEngine.Mesh mesh = m_MeshAssignments.GetValue(meshIndex, meshNumeration).mesh;
+            m_MeshesPersistent[m_Meshes.IndexOf(mesh)] = true;
+        }
+        
         /// <summary>
         /// Imported Unity Mesh count. A single glTF mesh is converted into one or more Unity Meshes.
         /// </summary>
@@ -2502,6 +2545,7 @@ namespace GLTFast
                         );
                     }
                     m_Meshes.Add(mesh);
+                    m_MeshesPersistent.Add(false);
                 }
                 else
                 {
@@ -2531,6 +2575,7 @@ namespace GLTFast
         async Task GenerateMaterials()
         {
             m_Materials = new UnityEngine.Material[Root.Materials.Count];
+            m_MaterialsPersistent = new bool[m_Materials.Length];
             for (var i = 0; i < m_Materials.Length; i++)
             {
                 await DeferAgent.BreakPoint(.0001f);
@@ -2543,6 +2588,7 @@ namespace GLTFast
                     pointsSupport
                 );
                 m_Materials[i] = material;
+                m_MaterialsPersistent[i] = false;
                 m_MaterialGenerator.SetLogger(null);
                 Profiler.EndSample();
             }
@@ -3471,6 +3517,7 @@ namespace GLTFast
             if (meshAssignmentIndices != null)
             {
                 m_Meshes = new List<UnityEngine.Mesh>();
+                m_MeshesPersistent = new List<bool>();
                 m_MeshAssignments = new FlatArray<MeshAssignment>(meshAssignmentIndices);
             }
             var tmpList = new List<JobHandle>();
