@@ -761,6 +761,12 @@ namespace GLTFast
         /// </summary>
         public void Dispose()
         {
+            if (!m_Settings.FreeBufferImmediatelyAfterLoad)
+            {
+                m_Buffers = null;
+                m_BinChunks = null;
+            }
+
             if (m_ImportInstances != null)
             {
                 foreach (var importInstance in m_ImportInstances)
@@ -2801,8 +2807,11 @@ namespace GLTFast
         /// </summary>
         void DisposeVolatileData()
         {
-            m_Buffers = null;
-            m_BinChunks = null;
+            if (m_Settings.FreeBufferImmediatelyAfterLoad)
+            {
+                m_Buffers = null;
+                m_BinChunks = null;
+            }
 
             if (m_VolatileDisposables != null)
             {

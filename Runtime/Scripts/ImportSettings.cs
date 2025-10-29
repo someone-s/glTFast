@@ -76,6 +76,15 @@ namespace GLTFast
             set => anisotropicFilterLevel = value;
         }
 
+        /// <summary>
+        /// This property defines whether to dispose volatile buffers immediately after asset load, or only when GLTFImport dispose.
+        /// </summary>
+        public bool FreeBufferImmediatelyAfterLoad
+        {
+            get => disposeBufferImmediatelyAfterLoad;
+            set => disposeBufferImmediatelyAfterLoad = value;
+        }
+
         [SerializeField]
         [Tooltip("Controls how node names are created.")]
         NameImportMethod nodeNameMethod = NameImportMethod.Original;
@@ -103,5 +112,9 @@ namespace GLTFast
         [SerializeField]
         [Tooltip("Anisotropic filtering level for imported textures.")]
         int anisotropicFilterLevel = 1;
+
+        [SerializeField]
+        [Tooltip("Controls whether to dispose volatile buffers immediately after asset load, or only when GLTFImport dispose.")]
+        bool disposeBufferImmediatelyAfterLoad = true;
     }
 }
