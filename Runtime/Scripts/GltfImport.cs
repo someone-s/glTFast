@@ -897,6 +897,32 @@ namespace GLTFast
             return false;
         }
 
+        /// <summary>
+        /// Mark a material and all associated texture to be kept when the GltfImport instance is disposed
+        /// </summary>
+        /// <returns>bool if index successfully marked as persistent</returns>
+        public bool MarkMaterialPersistentWithTextures(int index)
+        {
+            MarkMaterialPersistent(index);
+
+            var material = GetSourceMaterial(index);
+
+            if (material?.PbrMetallicRoughness?.BaseColorTexture != null)
+                MarkTexturePersistent(material.PbrMetallicRoughness.BaseColorTexture.index);
+
+            if (material?.PbrMetallicRoughness?.MetallicRoughnessTexture != null)
+                MarkTexturePersistent(material.PbrMetallicRoughness.MetallicRoughnessTexture.index);
+
+            if (material?.NormalTexture != null)
+                MarkTexturePersistent(material.NormalTexture.index);
+
+            if (material?.EmissiveTexture != null)
+                MarkTexturePersistent(material.EmissiveTexture.index);
+                
+            if (material?.OcclusionTexture != null) 
+                MarkTexturePersistent(material.OcclusionTexture.index);
+        }
+
         /// <inheritdoc />
         public async Task<UnityEngine.Material> GetMaterialAsync(int index)
         {
