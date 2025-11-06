@@ -903,7 +903,10 @@ namespace GLTFast
         /// <returns>bool if index successfully marked as persistent</returns>
         public bool MarkMaterialPersistentWithTextures(int index)
         {
-            MarkMaterialPersistent(index);
+            bool success;
+
+            success = MarkMaterialPersistent(index);
+            if (!success) return false;
 
             var material = GetSourceMaterial(index);
 
@@ -918,9 +921,11 @@ namespace GLTFast
 
             if (material?.EmissiveTexture != null)
                 MarkTexturePersistent(material.EmissiveTexture.index);
-                
-            if (material?.OcclusionTexture != null) 
+
+            if (material?.OcclusionTexture != null)
                 MarkTexturePersistent(material.OcclusionTexture.index);
+
+            return true;
         }
 
         /// <inheritdoc />
