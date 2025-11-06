@@ -225,6 +225,7 @@ namespace GLTFast
         /// </summary>
         Texture2D[] m_Textures;
         bool[] m_TexturesPersistent;
+        int[] m_TexturesToResourcesIndex;
 
 #if KTX_IS_ENABLED
         HashSet<int> m_NonFlippedYTextureIndices;
@@ -256,6 +257,7 @@ namespace GLTFast
         UnityEngine.Material[] m_Materials;
         bool[] m_MaterialsPersistent;
         List<UnityEngine.Object> m_Resources;
+        List<bool> m_ResourcesPersistent;
 
         /// <summary>
         /// Unity's animation system addresses target GameObjects by hierarchical name.
@@ -795,10 +797,10 @@ namespace GLTFast
                 if (objects != null)
                 {
                     var objectsEnumerator = objects.GetEnumerator();
-                    var persistenceEnumerator = persistence.GetEnumerator();
-                    while (objectsEnumerator.MoveNext() && persistenceEnumerator.MoveNext())
+                    var persistenceEnumerator = persistence?.GetEnumerator();
+                    while (objectsEnumerator.MoveNext() && (persistenceEnumerator?.MoveNext() ?? true))
                     {
-                        if (!persistenceEnumerator.Current)
+                        if (!(persistenceEnumerator?.Current ?? false))
                             SafeDestroy(objectsEnumerator.Current);
                     }
                 }
@@ -816,6 +818,7 @@ namespace GLTFast
             DisposeArrayWithPersistence(m_Textures, m_TexturesPersistent);
             m_Textures = null;
             m_TexturesPersistent = null;
+            m_TexturesToResourcesIndex = null;
 
             if (m_AccessorData != null)
             {
@@ -830,8 +833,9 @@ namespace GLTFast
             DisposeArrayWithPersistence(m_Meshes, m_MeshesPersistent);
             m_Meshes = null;
             m_MeshesPersistent = null;
-            DisposeArray(m_Resources);
+            DisposeArrayWithPersistence(m_Resources, m_ResourcesPersistent);
             m_Resources = null;
+            m_ResourcesPersistent = null;
         }
 
         /// <summary>
@@ -961,6 +965,21 @@ namespace GLTFast
                 return m_Textures[index];
             }
             return null;
+        }
+
+        /// <summary>
+        /// Mark a texture to be kept when the GltfImport instance is disposed
+        /// </summary>
+        /// <returns>bool if index successfully marked as persistent</returns>
+        public bool MarkTexturePersistent(int index)
+        {
+            if (m_TexturesPersistent != null && index >= 0 && index < m_TexturesPersistent.Length)
+            {
+                m_TexturesPersistent[index] = true;
+                m_ResourcesPersistent[m_TexturesToResourcesIndex[index]] = true;
+                return true;
+            }
+            return false;
         }
 
         /// <inheritdoc cref="IGltfReadable.IsTextureYFlipped"/>
@@ -2267,6 +2286,7 @@ namespace GLTFast
         async Task<bool> Prepare()
         {
             m_Resources = new List<UnityEngine.Object>();
+            m_ResourcesPersistent = new List<bool>();
 
             if (Root.Images != null && Root.Textures != null && Root.Materials != null)
             {
@@ -2607,6 +2627,7 @@ namespace GLTFast
             var defaultKey = new SamplerKey(new Sampler());
             m_Textures = new Texture2D[Root.Textures.Count];
             m_TexturesPersistent = new bool[m_Textures.Length];
+            m_TexturesToResourcesIndex = new int[m_Textures.Length];
             var imageVariants = new Dictionary<SamplerKey, Texture2D>[m_Images.Length];
             for (var textureIndex = 0; textureIndex < Root.Textures.Count; textureIndex++)
             {
@@ -2645,6 +2666,8 @@ namespace GLTFast
                     {
                         var newImg = UnityEngine.Object.Instantiate(img);
                         m_Resources.Add(newImg);
+                        var resourceIndex = m_ResourcesPersistent.Count;
+                        m_ResourcesPersistent.Add(false);
 #if DEBUG
                         newImg.name = $"{img.name}_sampler{txt.sampler}";
                         Logger?.Warning(LogCode.ImageMultipleSamplers,imageIndex.ToString());
@@ -2652,6 +2675,7 @@ namespace GLTFast
                         sampler?.Apply(newImg, m_Settings.DefaultMinFilterMode, m_Settings.DefaultMagFilterMode);
                         imageVariants[imageIndex][key] = newImg;
                         m_Textures[textureIndex] = newImg;
+                        m_TexturesToResourcesIndex[textureIndex] = resourceIndex;
                     }
                 }
             }
@@ -3185,6 +3209,7 @@ namespace GLTFast
                 if (m_Images[i] != null)
                 {
                     m_Resources.Add(m_Images[i]);
+                    m_ResourcesPersistent.Add(false);
                 }
                 var img = srcImages[i];
                 ImageFormat imgFormat = m_ImageFormats[i];
@@ -3240,6 +3265,7 @@ namespace GLTFast
 
                             m_Images[i] = txt;
                             m_Resources.Add(txt);
+                            m_ResourcesPersistent.Add(false);
                             Profiler.EndSample();
                         }
                     }
