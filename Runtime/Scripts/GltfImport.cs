@@ -224,6 +224,7 @@ namespace GLTFast
         /// /// <seealso cref="m_Images"/>
         /// </summary>
         Texture2D[] m_Textures;
+        bool[] m_TexturesPersistent;
 
 #if KTX_IS_ENABLED
         HashSet<int> m_NonFlippedYTextureIndices;
@@ -812,8 +813,9 @@ namespace GLTFast
             m_AnimationClips = null;
 #endif
 
-            DisposeArray(m_Textures);
+            DisposeArrayWithPersistence(m_Textures, m_TexturesPersistent);
             m_Textures = null;
+            m_TexturesPersistent = null;
 
             if (m_AccessorData != null)
             {
@@ -878,7 +880,7 @@ namespace GLTFast
         }
 
         /// <summary>
-        /// Mark a mesh to be kept when the GltfImport instance is disposed
+        /// Mark a material to be kept when the GltfImport instance is disposed
         /// </summary>
         /// <returns>bool if index successfully marked as persistent</returns>
         public bool MarkMaterialPersistent(int index)
@@ -2604,6 +2606,7 @@ namespace GLTFast
         {
             var defaultKey = new SamplerKey(new Sampler());
             m_Textures = new Texture2D[Root.Textures.Count];
+            m_TexturesPersistent = new bool[m_Textures.Length];
             var imageVariants = new Dictionary<SamplerKey, Texture2D>[m_Images.Length];
             for (var textureIndex = 0; textureIndex < Root.Textures.Count; textureIndex++)
             {
